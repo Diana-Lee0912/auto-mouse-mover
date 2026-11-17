@@ -53,17 +53,17 @@ Keep the window open while you want the script to work; minimizing it is fine. T
 
 ## Settings
 
-Open `auto_mouse_mover.py` in any text editor (TextEdit on macOS, Notepad on Windows) and change only the settings block at the top. The variable names are in Chinese; here's what each one means:
+Open `auto_mouse_mover.py` in any text editor (TextEdit on macOS, Notepad on Windows) and change only the `SETTINGS` block at the top:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `上班_最早` | `"08:30"` | Earliest start time |
-| `上班_最晚` | `"08:40"` | Latest start time |
-| `下班_最早` | `"16:20"` | Earliest stop time |
-| `下班_最晚` | `"16:40"` | Latest stop time |
-| `上班日` | `"一二三四五"` | Days to run, as Chinese numerals: `一` Mon, `二` Tue, `三` Wed, `四` Thu, `五` Fri, `六` Sat, `日` Sun. For Mon–Sat, write `"一二三四五六"`. |
-| `滑鼠間隔秒數` | `60` | Seconds between mouse nudges |
-| `自動開關Teams` | `True` | `True` opens and quits Teams automatically; `False` leaves Teams alone |
+| `START_EARLIEST` | `"08:30"` | Earliest start time |
+| `START_LATEST` | `"08:40"` | Latest start time |
+| `STOP_EARLIEST` | `"16:20"` | Earliest stop time |
+| `STOP_LATEST` | `"16:40"` | Latest stop time |
+| `WORKDAYS` | `"Mon,Tue,Wed,Thu,Fri"` | Days to run, separated by commas. For Mon–Sat, write `"Mon,Tue,Wed,Thu,Fri,Sat"`. |
+| `MOUSE_INTERVAL_SECONDS` | `60` | Seconds between mouse nudges |
+| `AUTO_OPEN_CLOSE_TEAMS` | `True` | `True` opens and quits Teams automatically; `False` leaves Teams alone |
 
 Times use the 24-hour `"HH:MM"` format. The latest start time must be earlier than the earliest stop time. If a setting is invalid, the script prints what's wrong and exits instead of running with bad values.
 
@@ -97,7 +97,7 @@ Save the file and run it again for changes to take effect.
 - **Mac**：打開「終端機」，輸入 `python3 `（後面空一格），把檔案拖進去按 Enter。第一次使用要到「系統設定 → 隱私權與安全性 → 輔助使用」打開「終端機」，再重開終端機執行一次。
 - **Windows**：先到 [python.org](https://www.python.org/downloads/) 安裝 Python（勾選 **Add python.exe to PATH**），打開「命令提示字元」，輸入 `python `，把檔案拖進去按 Enter。
 
-**修改設定**：用文字編輯器打開檔案，只改最上面「設定區」裡的值。檔案內有中文註解說明每一項。
+**修改設定**：用文字編輯器打開檔案，只改最上面 `SETTINGS` 區塊裡的值（上下班時間範圍、上班日、滑鼠間隔、是否自動開關 Teams）。各項說明請見上方英文的 Settings 表格。
 
 **停止**：按 `Ctrl + C` 或直接關掉視窗。
 
