@@ -84,10 +84,16 @@ IS_WINDOWS = platform.system() == "Windows"
 # ── Install pyautogui (the library that moves the mouse) if missing ──
 def _install_pyautogui():
     print("First run: installing the required package. This takes about a minute...\n")
-    base = [sys.executable, "-m", "pip", "install", "--user", "pyautogui"]
-    # Try a normal install first; some macOS Python setups block that,
-    # so retry with an extra flag if needed.
-    for cmd in (base, base + ["--break-system-packages"]):
+    base = [sys.executable, "-m", "pip", "install", "pyautogui"]
+    # Try a per-user install first. Some macOS Python setups block that, so
+    # retry with an extra flag. Virtual environments don't allow --user at all,
+    # so finally try a plain install.
+    attempts = (
+        base + ["--user"],
+        base + ["--user", "--break-system-packages"],
+        base,
+    )
+    for cmd in attempts:
         if subprocess.call(cmd) == 0:
             return True
     return False
@@ -151,6 +157,15 @@ for _day in WORKDAYS.replace(" ", ",").split(","):
 if _unknown_days or not WORKDAY_SET:
     _exit_with(f'[Error] WORKDAYS in SETTINGS should look like "Mon,Tue,Wed,Thu,Fri". '
                f'Got: {WORKDAYS!r}')
+
+if isinstance(MOUSE_INTERVAL_SECONDS, bool) or not isinstance(MOUSE_INTERVAL_SECONDS, (int, float)) \
+        or MOUSE_INTERVAL_SECONDS < 1:
+    _exit_with(f"[Error] MOUSE_INTERVAL_SECONDS in SETTINGS should be a number of seconds, "
+               f"1 or more (no quotes). Got: {MOUSE_INTERVAL_SECONDS!r}")
+
+# Accept "False" / "false" / "no" written in quotes too, since that's an easy mistake
+if isinstance(AUTO_OPEN_CLOSE_TEAMS, str):
+    AUTO_OPEN_CLOSE_TEAMS = AUTO_OPEN_CLOSE_TEAMS.strip().lower() in ("true", "yes", "y", "1")
 
 
 # ── Pick today's random start and stop times ────────────────────────
