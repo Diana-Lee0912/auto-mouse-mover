@@ -1,6 +1,15 @@
 # auto-mouse-mover
 
+![Python 3.7+](https://img.shields.io/badge/python-3.7%2B-3776AB?logo=python&logoColor=white)
+![Platform: macOS | Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+[![License: MIT](https://img.shields.io/github/license/Diana-Lee0912/auto-mouse-mover)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/Diana-Lee0912/auto-mouse-mover)](https://github.com/Diana-Lee0912/auto-mouse-mover/commits/main)
+
 During the work hours you set, this script nudges the mouse 1 pixel and back once a minute, so your computer and Microsoft Teams don't switch to "Away". It opens Teams when the work period starts and quits it when the period ends.
+
+<p align="center">
+  <img src="docs/screenshot.svg" alt="Terminal output: the script waits until the work period, opens Teams, moves the mouse every minute, then quits Teams when stopped with Ctrl+C" width="600">
+</p>
 
 [中文說明在下方](#中文說明)
 
