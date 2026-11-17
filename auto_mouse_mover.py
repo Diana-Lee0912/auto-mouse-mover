@@ -9,10 +9,20 @@
 #   so your computer and Teams don't switch to "Away".
 #   It opens Teams when work starts and quits Teams when work ends.
 #   Each day, the start and stop times are picked at random from the
-#   ranges you set below.
+#   ranges you set.
 #
 # ---------------------------------------------------------------------
-#  FIRST-TIME SETUP: macOS
+#  QUICK INSTALL (recommended)
+#   Paste one line into Terminal (macOS) or PowerShell (Windows).
+#   The installer asks for your work hours, then starts the program.
+#
+#   macOS:
+#     curl -fsSL https://raw.githubusercontent.com/Diana-Lee0912/auto-mouse-mover/main/install.sh | bash
+#   Windows (PowerShell):
+#     irm https://raw.githubusercontent.com/Diana-Lee0912/auto-mouse-mover/main/install.ps1 | iex
+#
+# ---------------------------------------------------------------------
+#  MANUAL SETUP: macOS
 #   1. Open Terminal: press Command + Space, type "Terminal", press Enter.
 #   2. Type  python3  (with a space after it), drag this file into the
 #      Terminal window, and press Enter.
@@ -23,28 +33,28 @@
 #      System Settings -> Privacy & Security -> Accessibility -> turn on Terminal.
 #      Then quit Terminal completely (Command + Q) and repeat steps 1 and 2.
 #
-#  FIRST-TIME SETUP: Windows
+#  MANUAL SETUP: Windows
 #   1. Download and install Python from https://www.python.org/downloads/
 #      IMPORTANT: tick "Add python.exe to PATH" at the bottom of the installer.
 #   2. Press the Start key, type "cmd", and open Command Prompt.
 #   3. Type  python  (with a space after it), drag this file into the
 #      window, and press Enter.
 #
-#  EVERY DAY AFTER THAT
-#   Just repeat the "drag the file in and press Enter" step.
-#   Keep the window open while it runs (minimizing it is fine).
-#
 #  HOW TO STOP
 #   Press  Ctrl + C  in the window, or just close the window.
 #
 #  CHANGING THE SETTINGS
-#   Open this file in TextEdit (macOS) or Notepad (Windows).
-#   Only change the values in the SETTINGS block below; leave the rest alone.
-#   Save, then run the file again.
+#   Easiest: run the program with --setup and answer the questions:
+#     python3 auto_mouse_mover.py --setup      (Windows: python instead of python3)
+#   (If you used the quick installer, just double-click "Change settings".)
+#   Your answers are saved in config.json next to this file.
+#
+#   You can also edit the SETTINGS block below. But if config.json exists,
+#   it takes priority over the block, so delete config.json first.
 # =====================================================================
 
 
-# ┌──────────────────── SETTINGS (only change these) ────────────────────┐
+# ┌──────────────────────────── SETTINGS ────────────────────────────────┐
 
 # Start time: each day, a random time between these two is picked.
 # Use 24-hour "HH:MM" format.
@@ -70,6 +80,8 @@ AUTO_OPEN_CLOSE_TEAMS = True
 
 
 import sys
+import os
+import json
 import time
 import datetime
 import subprocess
@@ -79,6 +91,16 @@ import platform
 
 IS_MAC = platform.system() == "Darwin"
 IS_WINDOWS = platform.system() == "Windows"
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+
+def _exit_with(message, code=1):
+    print(message)
+    try:
+        input("Press Enter to exit...")
+    except EOFError:
+        pass
+    sys.exit(code)
 
 
 # ── Install pyautogui (the library that moves the mouse) if missing ──
@@ -99,12 +121,6 @@ def _install_pyautogui():
     return False
 
 
-def _exit_with(message, code=1):
-    print(message)
-    input("Press Enter to exit...")
-    sys.exit(code)
-
-
 try:
     import pyautogui
 except ModuleNotFoundError:
@@ -119,63 +135,180 @@ except ModuleNotFoundError:
     try:
         import pyautogui
     except ModuleNotFoundError:
-        _exit_with("\n[Done] Install finished! Close this window and run the file again.", 0)
+        _exit_with("\n[Done] Install finished! Close this window and run the program again.", 0)
 
 
-# ── Check the settings for mistakes ─────────────────────────────────
-def _parse_time(text, name):
-    try:
-        h, m = text.strip().split(":")
-        h, m = int(h), int(m)
-        assert 0 <= h <= 23 and 0 <= m <= 59
-        return h * 60 + m
-    except Exception:
-        _exit_with(f'[Error] {name} in SETTINGS has the wrong format: {text!r}. '
-                   f'It should look like "08:30".')
-
-
-START_MIN_1 = _parse_time(START_EARLIEST, "START_EARLIEST")
-START_MIN_2 = _parse_time(START_LATEST, "START_LATEST")
-STOP_MIN_1 = _parse_time(STOP_EARLIEST, "STOP_EARLIEST")
-STOP_MIN_2 = _parse_time(STOP_LATEST, "STOP_LATEST")
-
-if START_MIN_1 > START_MIN_2 or STOP_MIN_1 > STOP_MIN_2 or START_MIN_2 >= STOP_MIN_1:
-    _exit_with("[Error] The times in SETTINGS don't make sense. Each EARLIEST must be "
-               "at or before its LATEST, and START_LATEST must be before STOP_EARLIEST.")
-
+# ── Reading and checking settings ───────────────────────────────────
 DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-_unknown_days = []
-WORKDAY_SET = set()
-for _day in WORKDAYS.replace(" ", ",").split(","):
-    _day = _day.strip().lower()[:3]
-    if not _day:
-        continue
-    if _day in DAY_NAMES:
-        WORKDAY_SET.add(DAY_NAMES.index(_day))
-    else:
-        _unknown_days.append(_day)
-if _unknown_days or not WORKDAY_SET:
-    _exit_with(f'[Error] WORKDAYS in SETTINGS should look like "Mon,Tue,Wed,Thu,Fri". '
-               f'Got: {WORKDAYS!r}')
 
-if isinstance(MOUSE_INTERVAL_SECONDS, bool) or not isinstance(MOUSE_INTERVAL_SECONDS, (int, float)) \
-        or MOUSE_INTERVAL_SECONDS < 1:
-    _exit_with(f"[Error] MOUSE_INTERVAL_SECONDS in SETTINGS should be a number of seconds, "
-               f"1 or more (no quotes). Got: {MOUSE_INTERVAL_SECONDS!r}")
 
-# Accept "False" / "false" / "no" written in quotes too, since that's an easy mistake
-if isinstance(AUTO_OPEN_CLOSE_TEAMS, str):
-    AUTO_OPEN_CLOSE_TEAMS = AUTO_OPEN_CLOSE_TEAMS.strip().lower() in ("true", "yes", "y", "1")
+def parse_time(text):
+    """'08:30' -> minutes since midnight. Raises ValueError with a friendly message."""
+    try:
+        h, m = str(text).strip().split(":")
+        h, m = int(h), int(m)
+    except ValueError:
+        raise ValueError(f'{text!r} is not a time. Use "HH:MM", like 08:30.')
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        raise ValueError(f'{text!r} is not a valid time. Use 24-hour "HH:MM", like 17:30.')
+    return h * 60 + m
+
+
+def parse_days(text):
+    """'Mon,Tue' -> {0, 1}"""
+    days = set()
+    for part in str(text).replace(" ", ",").split(","):
+        part = part.strip().lower()
+        if not part:
+            continue
+        if part[:3] not in DAY_NAMES:
+            raise ValueError(f"{part!r} is not a day. Use Mon, Tue, Wed, Thu, Fri, Sat, Sun.")
+        days.add(DAY_NAMES.index(part[:3]))
+    if not days:
+        raise ValueError("List at least one day, like Mon,Tue,Wed,Thu,Fri.")
+    return days
+
+
+def parse_yes_no(value):
+    # Also accepts "False" written in quotes, since that's an easy mistake
+    if isinstance(value, bool):
+        return value
+    v = str(value).strip().lower()
+    if v in ("y", "yes", "true", "1"):
+        return True
+    if v in ("n", "no", "false", "0"):
+        return False
+    raise ValueError(f"{value!r} should be y (yes) or n (no).")
+
+
+def parse_interval(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 1:
+        raise ValueError(f"MOUSE_INTERVAL_SECONDS should be a number of seconds, "
+                         f"1 or more (no quotes). Got: {value!r}")
+    return value
+
+
+def build_settings(raw):
+    """Check every setting and turn it into the form the program uses."""
+    s = {
+        "start": (parse_time(raw["start_earliest"]), parse_time(raw["start_latest"])),
+        "stop": (parse_time(raw["stop_earliest"]), parse_time(raw["stop_latest"])),
+        "workdays": parse_days(raw["workdays"]),
+        "teams": parse_yes_no(raw["auto_open_close_teams"]),
+        "interval": parse_interval(raw["mouse_interval_seconds"]),
+    }
+    if s["start"][0] > s["start"][1]:
+        raise ValueError("The earliest start time must be at or before the latest start time.")
+    if s["stop"][0] > s["stop"][1]:
+        raise ValueError("The earliest stop time must be at or before the latest stop time.")
+    if s["start"][1] >= s["stop"][0]:
+        raise ValueError("The latest start time must be before the earliest stop time.")
+    return s
+
+
+def settings_from_block():
+    return {
+        "start_earliest": START_EARLIEST,
+        "start_latest": START_LATEST,
+        "stop_earliest": STOP_EARLIEST,
+        "stop_latest": STOP_LATEST,
+        "workdays": WORKDAYS,
+        "auto_open_close_teams": AUTO_OPEN_CLOSE_TEAMS,
+        "mouse_interval_seconds": MOUSE_INTERVAL_SECONDS,
+    }
+
+
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        print(f"[Warning] Couldn't read {CONFIG_FILE}; using the SETTINGS block instead.")
+        return {}
+
+
+def save_config(raw):
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(raw, f, indent=2)
+        print(f"\nSaved to {CONFIG_FILE}")
+        print("To change these later, run this program with --setup.\n")
+    except OSError as e:
+        print(f"\n[Warning] Couldn't save your answers ({e}). They'll be used this time only.\n")
+
+
+# ── Interactive setup (python3 auto_mouse_mover.py --setup) ─────────
+def _ask(question, default, check):
+    while True:
+        answer = input(f"{question} [{default}]: ").strip()
+        value = answer or str(default)
+        try:
+            check(value)
+            return value
+        except ValueError as e:
+            print(f"  -> {e} Please try again.")
+
+
+def run_setup(raw):
+    print("\n=== Setup ===")
+    print("Each day, the program starts at a random time between the earliest and latest")
+    print("start time, and stops at a random time between the earliest and latest stop time.")
+    print("Press Enter to keep the value shown in [brackets].\n")
+    def ask_time(question, default):
+        minutes = parse_time(_ask(question, default, parse_time))
+        return f"{minutes // 60:02d}:{minutes % 60:02d}"  # store 9:00 as 09:00
+
+    while True:
+        new = dict(raw)
+        new["start_earliest"] = ask_time("Earliest start time (HH:MM)", raw["start_earliest"])
+        new["start_latest"] = ask_time("Latest start time   (HH:MM)", raw["start_latest"])
+        new["stop_earliest"] = ask_time("Earliest stop time  (HH:MM)", raw["stop_earliest"])
+        new["stop_latest"] = ask_time("Latest stop time    (HH:MM)", raw["stop_latest"])
+        new["workdays"] = _ask("Workdays (e.g. Mon,Tue,Wed,Thu,Fri)", raw["workdays"], parse_days)
+        try:
+            teams_default = "y" if parse_yes_no(raw["auto_open_close_teams"]) else "n"
+        except ValueError:
+            teams_default = "y"
+        new["auto_open_close_teams"] = parse_yes_no(
+            _ask("Open and quit Microsoft Teams automatically? (y/n)", teams_default, parse_yes_no))
+        try:
+            build_settings(new)
+            break
+        except ValueError as e:
+            print(f"\n  -> {e} Let's go through it again.\n")
+            raw = new  # keep the answers as the new defaults
+    save_config(new)
+    return new
+
+
+def load_settings(force_setup=False):
+    raw = settings_from_block()
+    config = load_config()
+    raw.update({k: v for k, v in config.items() if k in raw})
+    if force_setup:
+        raw = run_setup(raw)
+    try:
+        return build_settings(raw)
+    except ValueError as e:
+        where = "config.json" if os.path.exists(CONFIG_FILE) else "the SETTINGS block"
+        _exit_with(f"[Error] Problem in {where}: {e}\n"
+                   f"Run this program with --setup to fix it.")
+
+
+S = None  # the checked settings; filled in by main()
 
 
 # ── Pick today's random start and stop times ────────────────────────
 def new_daily_schedule():
-    s = random.randint(START_MIN_1, START_MIN_2)
-    e = random.randint(STOP_MIN_1, STOP_MIN_2)
+    s = random.randint(*S["start"])
+    e = random.randint(*S["stop"])
     return s // 60, s % 60, e // 60, e % 60
 
 
-TODAY_START_H, TODAY_START_M, TODAY_STOP_H, TODAY_STOP_M = new_daily_schedule()
+TODAY_START_H = TODAY_START_M = TODAY_STOP_H = TODAY_STOP_M = 0
 
 
 def at(day, hour, minute):
@@ -183,7 +316,7 @@ def at(day, hour, minute):
 
 
 def in_work_time(now):
-    if now.weekday() not in WORKDAY_SET:
+    if now.weekday() not in S["workdays"]:
         return False
     return at(now, TODAY_START_H, TODAY_START_M) <= now < at(now, TODAY_STOP_H, TODAY_STOP_M)
 
@@ -192,7 +325,7 @@ def next_work_start(now):
     """Find when the next work period starts (skips days that aren't workdays)."""
     for i in range(8):
         day = now + datetime.timedelta(days=i)
-        if day.weekday() in WORKDAY_SET:
+        if day.weekday() in S["workdays"]:
             start = at(day, TODAY_START_H, TODAY_START_M)
             if start > now:
                 return start
@@ -201,7 +334,7 @@ def next_work_start(now):
 
 # ── Open / quit Teams (macOS and Windows) ───────────────────────────
 def open_teams():
-    if not AUTO_OPEN_CLOSE_TEAMS:
+    if not S["teams"]:
         return
     print("[Teams] Opening Microsoft Teams...")
     try:
@@ -215,7 +348,7 @@ def open_teams():
 
 
 def close_teams():
-    if not AUTO_OPEN_CLOSE_TEAMS:
+    if not S["teams"]:
         return
     print("[Teams] Quitting Microsoft Teams...")
     try:
@@ -245,7 +378,10 @@ def move_mouse():
 
 # ── Main loop ──────────────────────────────────────────────────────
 def main():
-    global TODAY_START_H, TODAY_START_M, TODAY_STOP_H, TODAY_STOP_M
+    global S, TODAY_START_H, TODAY_START_M, TODAY_STOP_H, TODAY_STOP_M
+
+    S = load_settings(force_setup="--setup" in sys.argv[1:])
+    TODAY_START_H, TODAY_START_M, TODAY_STOP_H, TODAY_STOP_M = new_daily_schedule()
 
     print("=== auto-mouse-mover started ===")
     print(f"Today's schedule: start {TODAY_START_H:02d}:{TODAY_START_M:02d} / "
@@ -282,7 +418,7 @@ def main():
 
             if active:
                 move_mouse()
-                time.sleep(MOUSE_INTERVAL_SECONDS)
+                time.sleep(S["interval"])
             else:
                 next_start = next_work_start(now)
                 if next_start != shown_next_start:
@@ -300,4 +436,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        # Ctrl+C (or a closed input) during setup
+        print("\n\n[Stopped] Setup cancelled; nothing was changed.")
+        sys.exit(0)
